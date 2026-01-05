@@ -15,8 +15,8 @@ const allowedOrigins = [
   "http://localhost:5173",
   // luego agregas tu dominio final:
   // "https://amazingnailshn.com",
-  // "https://TU-FRONT.vercel.app",
-];
+   process.env.WEB_ORIGIN// "https://TU-FRONT.vercel.app",
+].filter(Boolean) as string[];
 
 app.use(cors({
   origin: allowedOrigins,
@@ -25,6 +25,13 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// ✅ Importante en Vercel: si entra como /api/xxx lo convertimos a /xxx
+app.use((req, _res, next) => {
+  if (req.url === "/api") req.url = "/";
+  if (req.url.startsWith("/api/")) req.url = req.url.replace("/api", "");
+  next();
+});
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
