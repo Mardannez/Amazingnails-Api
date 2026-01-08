@@ -8,7 +8,7 @@ import customersRouter from "./routes/customers";
 import staffRouter from "./routes/staff";
 import availabilityRouter from "./routes/availability";
 import bookings2Router from "./routes/bookings2";
-
+import calendarRouter from "./routes/calendar";
 const app = express();
 
 const allowedOrigins = [
@@ -40,5 +40,5 @@ app.use("/customers", customersRouter);
 app.use("/staff", staffRouter);
 app.use("/availability", availabilityRouter);
 app.use("/bookings2", bookings2Router);
-
+app.use("/calendar", calendarRouter);
 export default app;

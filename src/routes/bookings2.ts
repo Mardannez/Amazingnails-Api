@@ -276,4 +276,65 @@ router.post("/", async (req, res) => {
   });
 });
 
+
+
+//Metodo Get par traer las citas y armar el calendario
+
+
+router.get("/range", async (req, res) => {
+  const schema = z.object({
+    start: z.string().min(10), // "YYYY-MM-DD"
+    end: z.string().min(10),   // "YYYY-MM-DD"
+  });
+
+  const parsed = schema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const { start, end } = parsed.data;
+
+  // Normalizamos a UTC midnight
+  const startDate = new Date(`${start}T00:00:00.000Z`);
+  const endDate = new Date(`${end}T00:00:00.000Z`);
+
+  const bookings = await prisma.booking2.findMany({
+    where: {
+      booking_date: { gte: startDate, lt: endDate },
+    },
+    include: {
+      customer: true,
+      service: true,
+      staff: true,
+    },
+    orderBy: [{ booking_date: "asc" }, { start_min: "asc" }],
+  });
+
+  const toHHmm = (start_min: number) => {
+    const hh = Math.floor(start_min / 60);
+    const mm = start_min % 60;
+    return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  };
+
+  const mapped = bookings.map((b) => {
+    const dateISO = b.booking_date.toISOString().slice(0, 10);
+    return {
+      id: b.id,
+      dateISO,
+      time_local: toHHmm(b.start_min),
+      start_min: b.start_min,
+      duration_min: b.duration_min,
+      status: b.status,
+      customer_name: b.customer.full_name,
+      customer_phone: b.customer.phone,
+      customer_email: b.customer.email,
+      service_name: b.service.name,
+      staff_name: b.staff.name,
+    };
+  });
+
+  return res.json({ ok: true, start, end, bookings: mapped });
+});
+
+
+
+
 export default router;
