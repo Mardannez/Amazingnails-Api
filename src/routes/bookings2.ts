@@ -126,6 +126,18 @@ router.post("/", async (req, res) => {
 
   const { service_id, staff_id, booking_date, start_min, customer, notes } = parsed.data;
 
+      const staffNotifyEmailpost = (process.env.STAFF_NOTIFY_EMAIL || "").toLowerCase();
+      const customerEmail = (customer.email || "").toLowerCase();
+
+      const isInternalEmail =
+        customerEmail &&
+        staffNotifyEmailpost &&
+        customerEmail === staffNotifyEmailpost;
+
+      // Si pusieron el correo interno en el campo de la clienta, lo ignoramos
+      const safeCustomerEmail = isInternalEmail ? undefined : customer.email;
+
+
   // staff: si no viene, usa el primero activo
   const staff = staff_id
     ? await prisma.staff.findUnique({ where: { id: staff_id } })
@@ -168,14 +180,18 @@ router.post("/", async (req, res) => {
   // customer: por email o phone, si no crea
   let dbCustomer = null as any;
 
-  if (customer.email) dbCustomer = await prisma.customer.findFirst({ where: { email: customer.email } });
-  if (!dbCustomer && customer.phone) dbCustomer = await prisma.customer.findFirst({ where: { phone: customer.phone } });
+      if (safeCustomerEmail) {
+      dbCustomer = await prisma.customer.findFirst({ where: { email: safeCustomerEmail } });
+    }
+    if (!dbCustomer && customer.phone) {
+      dbCustomer = await prisma.customer.findFirst({ where: { phone: customer.phone } });
+    }
 
-  if (!dbCustomer) {
-    dbCustomer = await prisma.customer.create({
-      data: { full_name: customer.full_name, phone: customer.phone, email: customer.email },
-    });
-  }
+    if (!dbCustomer) {
+      dbCustomer = await prisma.customer.create({
+        data: { full_name: customer.full_name, phone: customer.phone, email: safeCustomerEmail },
+      });
+    }
 
   // crear booking
   const booking = await prisma.booking2.create({
@@ -208,7 +224,7 @@ router.post("/", async (req, res) => {
   const emailResults: any = { customer: null, staff: null };
 
   // 1) correo a clienta (solo si dejó email)
-  if (customer.email && from && process.env.RESEND_API_KEY) {
+  if (safeCustomerEmail  && from && process.env.RESEND_API_KEY) {
     try {
       const html = buildEmailHTML({
         title: "Confirmación de reserva",
@@ -227,7 +243,7 @@ router.post("/", async (req, res) => {
 
       const resp = await resend.emails.send({
         from,
-        to: customer.email,
+        to: safeCustomerEmail ,
         subject: `✅ Reserva confirmada - ${service.name} (${booking_date} ${startHHmm})`,
         html,
       });
